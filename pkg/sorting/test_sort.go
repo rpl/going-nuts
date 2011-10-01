@@ -1,9 +1,9 @@
 package main
 
 import (
-	"./mergesort"
-	"./quicksort"
-	"./heapsort"
+	"mergesort"
+	"quicksort"
+	"heapsort"
 	"fmt"
 )
 
