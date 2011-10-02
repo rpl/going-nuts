@@ -23,13 +23,13 @@ type ReplyMessage struct {
 
 type MessageChannel chan Message
 
-func goroutine6(ch MessageChannel) {
+func goroutine6(ch <-chan Message) {
   for ; ; {
 		msg := <- ch
 
 		switch cmsg := msg.(type) {
 		case CallMessage:
-			log.Print("RECEIVED CALL")
+			log.Print("RECEIVED CALL",msg)
 			cmsg.ReplyChannel <- ReplyMessage{Ok: true, Result: msg}
 	  case CastMessage:
 			log.Print("RECEIVED CAST",msg)
@@ -52,7 +52,7 @@ func main() {
 
 	go goroutine6(ch)
 
-  log.Print("HELLO ", Call(ch, "prova1", "WORLD"))
+  log.Print("GOT CALL REPLY ", Call(ch, "prova1", "WORLD"))
 
 	Cast(ch, "p2", "1")
 	Cast(ch, "p3", "2")
