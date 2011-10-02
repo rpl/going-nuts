@@ -37,13 +37,13 @@ func goroutine6(ch <-chan Message) {
 	}
 }
 
-func Call(ch MessageChannel, name string, args Data) Message {
+func Call(ch chan<- Message, name string, args Data) Message {
 	reply_ch := make(MessageChannel)
 	ch <- CallMessage{Name: name, Args: args, ReplyChannel: reply_ch}
 	return <- reply_ch
 }
 
-func Cast(ch MessageChannel, name string, args Data) {
+func Cast(ch chan<- Message, name string, args Data) {
 	ch <- CastMessage{Name: name, Args: args}
 }
 
