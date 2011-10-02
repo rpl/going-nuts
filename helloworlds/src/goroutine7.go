@@ -69,12 +69,12 @@ type IGenServerImpl interface {
 }
 
 type MyServer struct {
-  gsrv *GenServer
+  *GenServer
 }
 
 func (self *MyServer) Start() {
 	gsrv := new(GenServer)
-	self.gsrv = gsrv
+	self.GenServer = gsrv
 	gsrv.Start(self)  
 }
 
@@ -91,12 +91,12 @@ func (self *MyServer) HandleCall(msg CallMessage) {
 }
 
 func (self *MyServer) CallTest1(src string) Data {
-	reply := self.gsrv.Call("p1", src)
+	reply := self.GenServer.Call("p1", src)
 	return reply.Result
 }
 
 func (self *MyServer) CastTest2(src string) {
-	self.gsrv.Cast("p2", src)
+	self.GenServer.Cast("p2", src)
 }
 
 
