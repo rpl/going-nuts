@@ -22,9 +22,9 @@ func (self *GenServer) loop() {
 		case cmd := <- self.control_ch :
 			self.status = BUSY
 			switch ccmd := cmd.(type) {
-			case InitControlMessage:
+			case initControlMessage:
 				self.handle_init(&ccmd)
-			case StopControlMessage:
+			case stopControlMessage:
 				self.handle_stop(&ccmd)
 			}
 			}
@@ -44,14 +44,14 @@ func (self *GenServer) SetDebug(debug bool) {
 }
 
 // handle_init will be called to handle incoming InitControlMessages
-func (self *GenServer) handle_init(cmd *InitControlMessage) {
+func (self *GenServer) handle_init(cmd *initControlMessage) {
   self.log("RECEIVED INIT ",cmd)
 	self.status = READY
 	cmd.ReplyChannel <- ReplyMessage{Ok: true}
 }
 
 // handle_stop will be called to handle incoming StopControlMessages
-func (self *GenServer) handle_stop(cmd *StopControlMessage) {
+func (self *GenServer) handle_stop(cmd *stopControlMessage) {
 	defer func() {
 		// TODO: error handling
 		self.status = STOPPED
@@ -82,19 +82,19 @@ func (self *GenServer) GetStatus() int {
 func (self *GenServer) Start(impl IGenServerImpl) {
 	self.status = STARTING;
 	ch := make(MessageChannel)
-	control_ch := make(ControlChannel)
+	control_ch := make(controlChannel)
 	self.ch = ch
 	self.control_ch = control_ch
 	self.impl = impl
 	go self.loop()  
 	reply_ch := make(ReplyMessageChannel)
-	self.control_ch <- InitControlMessage{ReplyChannel: reply_ch}
+	self.control_ch <- initControlMessage{ReplyChannel: reply_ch}
 	<- reply_ch
 }
 
 func (self *GenServer) Stop() ReplyMessage {
 	reply_ch := make(ReplyMessageChannel)
-	self.control_ch <- StopControlMessage{ReplyChannel: reply_ch}
+	self.control_ch <- stopControlMessage{ReplyChannel: reply_ch}
 	return <- reply_ch
 }
 

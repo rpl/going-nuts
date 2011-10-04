@@ -26,21 +26,21 @@ type ReplyMessage struct {
 
 // ControlMessage is a control message (optionally waits for a reply 
 // on the ReplyChannel)
-type ControlMessage interface {}
+type controlMessage interface {}
 
-type InitControlMessage struct {
+type initControlMessage struct {
 	Args Data
   ReplyChannel ReplyMessageChannel
 }
 
-type StopControlMessage struct {
+type stopControlMessage struct {
 	Args Data
   ReplyChannel ReplyMessageChannel
 }
 
 // MessageChannel is the channel of the messages sent from a client to the gen_server
 type MessageChannel chan Message
-type ControlChannel chan ControlMessage
+type controlChannel chan controlMessage
 type ReplyMessageChannel chan ReplyMessage
 
 // GenServer statuses
@@ -55,7 +55,7 @@ const (
 // GenServer is the struct type of a GenServer, contains data needed by internal functions
 type GenServer struct {
   ch MessageChannel
-  control_ch ControlChannel
+  control_ch controlChannel
 	impl IGenServerImpl
 	state Data
 	status int
