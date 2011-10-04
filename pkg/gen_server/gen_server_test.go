@@ -44,7 +44,7 @@ func (self *TestServer) HandleCast(msg *CastMessage) {
 
 func (self *TestServer) HandleCall(msg *CallMessage) {
 	self.log("HANDLE CALL ", msg)
-	self.GenServer.Reply(msg, true, "WORLD")
+	msg.Reply(true, "WORLD")
 	self.log("MESSAGE SENT ", msg)
 }
 

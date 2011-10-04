@@ -109,7 +109,7 @@ func (self *GenServer) Call(name string, args Data) ReplyMessage {
 	return <- reply_ch
 }
 
-func (self *GenServer) Reply(rcv_msg *CallMessage, ok bool, result Data) {
-	rcv_msg.ReplyChannel <- ReplyMessage{Ok: ok, Result: result}
+func (self *CallMessage) Reply(ok bool, result Data) {
+	self.ReplyChannel <- ReplyMessage{Ok: ok, Result: result}
 }
 
