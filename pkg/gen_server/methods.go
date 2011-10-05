@@ -8,6 +8,8 @@ import (
 
 // loop implements the internal GenServer goroutine loop
 func (self *GenServer) loop() {
+	defer self.recover()
+
   for ; ; {
 		self.status = READY
 		select {
@@ -27,7 +29,22 @@ func (self *GenServer) loop() {
 			case stopControlMessage:
 				self.handle_stop(&ccmd)
 			}
+		}
+	}
+}
+
+func (self *GenServer) recover() {
+	if err := recover(); err != nil {
+		self.status = CRASHED
+		log.Println("RECOVERED FROM PANIC:",err)
+		for i := 2; ; i++ {
+			_, file, line, ok := runtime.Caller(i);
+			if ok {
+				log.Printf("%s : %d\n", file, line);
+			} else {
+				break;
 			}
+		} 
 	}
 }
 
@@ -93,23 +110,39 @@ func (self *GenServer) Start(impl IGenServerImpl) {
 }
 
 func (self *GenServer) Stop() ReplyMessage {
+	if self.status >= STOPPED {
+		return ReplyMessage{Ok: false, Error: "GenServer Stopped or Crashed"}
+	}
 	reply_ch := make(ReplyMessageChannel)
 	self.control_ch <- stopControlMessage{ReplyChannel: reply_ch}
 	return <- reply_ch
 }
 
 
-func (self *GenServer) Cast(name string, args Data) {
-	self.ch <- CastMessage{Name: name, Args: args}
+func (self *GenServer) Cast(payload Data) {
+	if self.status >= STOPPED {
+		return // Error: "GenServer Stopped or Crashed"
+	}
+
+	// NOTE: This is blocking if receive is not ready
+	self.ch <- CastMessage{Payload: payload}
 }
 
-func (self *GenServer) Call(name string, args Data) ReplyMessage {
-	reply_ch := make(ReplyMessageChannel)
-	self.ch <- CallMessage{Name: name, Args: args, ReplyChannel: reply_ch}
+func (self *GenServer) Call(payload Data) ReplyMessage {
+	if self.status >= STOPPED {
+		return ReplyMessage{Ok: false, Error: "GenServer Stopped or Crashed"}
+	}
+
+	reply_ch := make(ReplyMessageChannel,1)
+	self.ch <- CallMessage{Payload: payload, replyChannel: reply_ch}
 	return <- reply_ch
 }
 
 func (self *CallMessage) Reply(ok bool, result Data) {
-	self.ReplyChannel <- ReplyMessage{Ok: ok, Result: result}
+	select {
+	case self.replyChannel <- ReplyMessage{Ok: ok, Result: result}:
+	default:
+		// CLIENT GOROUTINE CRASHED?
+	}
 }
 

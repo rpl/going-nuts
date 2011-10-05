@@ -2,26 +2,25 @@ package gen_server
 
 // Message represents the opaque type of gen_server exchanged messages
 type Message interface {}
-// Data represents the opaque type of gen_server exchanged data
+// MessageContent represents the opaque type of gen_server exchanged data
 type Data interface {}
 
 // CastMessage is a asynchronous message (it doesn't need a reply)
 type CastMessage struct {
-	Name string
-	Args Data
+	Payload Data
 }
 
 // CallMessage is a synchronous message (it waits for a reply on the ReplyChannel)
 type CallMessage struct {
-  Name string
-	Args Data
-  ReplyChannel ReplyMessageChannel
+	Payload Data
+  replyChannel ReplyMessageChannel
 }
 
 // ReplyMessage is a reply to a CallMessage
 type ReplyMessage struct {
 	Ok bool
 	Result Data
+	Error Data
 }
 
 // ControlMessage is a control message (optionally waits for a reply 
@@ -50,6 +49,7 @@ const (
 	READY;
 	BUSY;
 	STOPPED;
+	CRASHED;
 )
 
 // GenServer is the struct type of a GenServer, contains data needed by internal functions
