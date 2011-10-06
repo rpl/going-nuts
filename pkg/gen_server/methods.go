@@ -4,6 +4,8 @@ package gen_server
 import (
 	"log"
 	"runtime"
+	"time"
+	"fmt"
 )
 
 // loop implements the internal GenServer goroutine loop
@@ -36,11 +38,11 @@ func (self *GenServer) loop() {
 func (self *GenServer) recover() {
 	if err := recover(); err != nil {
 		self.status = CRASHED
-		log.Println("RECOVERED FROM PANIC:",err)
+		self.log("RECOVERED FROM PANIC:",err)
 		for i := 2; ; i++ {
 			_, file, line, ok := runtime.Caller(i);
 			if ok {
-				log.Printf("%s : %d\n", file, line);
+				self.log(fmt.Sprintf("%s : %d\n", file, line),nil);
 			} else {
 				break;
 			}
@@ -95,27 +97,64 @@ func (self *GenServer) GetStatus() int {
 	return self.status
 }
 
+func CreateGenServer(impl IGenServerImpl) *GenServer {
+	gensrv := new(GenServer)
 
-func (self *GenServer) Start(impl IGenServerImpl) {
-	self.status = STARTING;
 	ch := make(MessageChannel)
 	control_ch := make(controlChannel)
-	self.ch = ch
-	self.control_ch = control_ch
-	self.impl = impl
+	gensrv.ch = ch
+	gensrv.control_ch = control_ch
+	gensrv.impl = impl
+
+	return gensrv
+}
+
+func (self *GenServer) Start() {
+	self.status = STARTING;
 	go self.loop()  
-	reply_ch := make(ReplyMessageChannel)
+	reply_ch := make(ReplyMessageChannel,1)
 	self.control_ch <- initControlMessage{ReplyChannel: reply_ch}
 	<- reply_ch
 }
+
+type callback_fn func() interface {}
+
+func send_and_wait_until(where chan interface {}, what interface {},
+	sent_cb callback_fn, timeout_cb callback_fn, timeout int64) (Data) {
+
+	timeout_ch := make(chan bool,1)
+	go func() {
+		time.Sleep(timeout)
+		timeout_ch <- true
+	}()
+	select {
+	case where <- what: 
+		return sent_cb()
+  case <- timeout_ch:
+		return timeout_cb()
+	}
+
+	return nil
+}
+
 
 func (self *GenServer) Stop() ReplyMessage {
 	if self.status >= STOPPED {
 		return ReplyMessage{Ok: false, Error: "GenServer Stopped or Crashed"}
 	}
-	reply_ch := make(ReplyMessageChannel)
-	self.control_ch <- stopControlMessage{ReplyChannel: reply_ch}
-	return <- reply_ch
+	timeout_ch := make(chan bool,1)
+	reply_ch := make(ReplyMessageChannel,1)
+	go func() {
+		time.Sleep(1e9)
+		timeout_ch <- true
+	}()
+	select {
+	case self.control_ch <- stopControlMessage{ReplyChannel: reply_ch}:
+		return <- reply_ch
+	case <- timeout_ch:
+		return ReplyMessage{Ok: false, Error: "GenServer Stop Timeout"}
+	}
+	return ReplyMessage{Ok: false, Error: "GenServer Error Unknown"}
 }
 
 
@@ -125,7 +164,11 @@ func (self *GenServer) Cast(payload Data) {
 	}
 
 	// NOTE: This is blocking if receive is not ready
-	self.ch <- CastMessage{Payload: payload}
+	send_and_wait_until(self.ch, CastMessage{Payload: payload},
+		func() interface{} { log.Print("CAST SENT"); return nil},
+		func() interface{} { log.Print("CAST TIMEOUT"); return nil},
+		5e9)
+	//self.ch <- CastMessage{Payload: payload}
 }
 
 func (self *GenServer) Call(payload Data) ReplyMessage {
@@ -133,9 +176,19 @@ func (self *GenServer) Call(payload Data) ReplyMessage {
 		return ReplyMessage{Ok: false, Error: "GenServer Stopped or Crashed"}
 	}
 
+	timeout_ch := make(chan bool,1)
 	reply_ch := make(ReplyMessageChannel,1)
-	self.ch <- CallMessage{Payload: payload, replyChannel: reply_ch}
-	return <- reply_ch
+	go func() {
+		time.Sleep(1e9)
+		timeout_ch <- true
+	}()
+	select {
+	case self.ch <- CallMessage{Payload: payload, replyChannel: reply_ch}:
+		return <- reply_ch
+	case <- timeout_ch:
+		return ReplyMessage{Ok: false, Error: "GenServer Stop Timeout"}
+	}
+	return ReplyMessage{Ok: false, Error: "GenServer Error Unknown"}
 }
 
 func (self *CallMessage) Reply(ok bool, result Data) {

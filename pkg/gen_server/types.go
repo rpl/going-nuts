@@ -38,8 +38,8 @@ type stopControlMessage struct {
 }
 
 // MessageChannel is the channel of the messages sent from a client to the gen_server
-type MessageChannel chan Message
-type controlChannel chan controlMessage
+type MessageChannel chan interface {} //Message
+type controlChannel chan interface {} //controlMessage
 type ReplyMessageChannel chan ReplyMessage
 
 // GenServer statuses

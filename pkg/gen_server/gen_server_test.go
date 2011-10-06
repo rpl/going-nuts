@@ -3,7 +3,8 @@ package gen_server
 import (
 	"testing"
 	pt "prettytest"
-	_ "log"
+	//"log"
+	"time"
 )
 
 type gen_serverTestSuite struct {
@@ -23,13 +24,13 @@ type TestServer struct {
 
 func CreateTestServer() *TestServer {
 	srv := new(TestServer)
-	srv.GenServer = new(GenServer)
+	srv.GenServer = CreateGenServer(srv)
 	//srv.GenServer.debug = true
 	return srv
 }
 
 func (self *TestServer) Start() bool {
-	self.GenServer.Start(self)  
+	self.GenServer.Start()  
 	return true
 }
 
@@ -124,4 +125,36 @@ func (s *gen_serverTestSuite) TestGenServer03_CrashOnCast() {
 
 	s.Equal(false, srv.Stop().Ok)
 	s.Equal(CRASHED, srv.GetStatus())
+}
+
+func (s *gen_serverTestSuite) TestGenServer04_ConcurrentCrashAndStop() {
+  srv := CreateTestServer()
+	ok := srv.Start()
+	s.Equal(true, ok)
+	s.Equal(READY, srv.GetStatus())
+
+	go func () {
+		srv.CastCrashTest("crashclient")
+	}()
+
+	srv.CallTest("wait")
+
+	srv.Stop()
+	s.Equal(CRASHED, srv.GetStatus())
+}
+
+func (s *gen_serverTestSuite) TestGenServer05_ConcurrentStopAndCall() {
+  srv := CreateTestServer()
+	ok := srv.Start()
+	s.Equal(true, ok)
+	s.Equal(READY, srv.GetStatus())
+
+	go func () {
+		srv.Stop()
+		//s.Equal(STOPPED, srv.GetStatus())
+	}()
+
+	time.Sleep(1e3)
+	reply := srv.CallTest("wait")
+	s.Equal(false, reply.Ok)
 }
