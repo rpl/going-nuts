@@ -109,14 +109,6 @@ func CreateGenServer(impl IGenServerImpl) *GenServer {
 	return gensrv
 }
 
-func (self *GenServer) Start() {
-	self.status = STARTING;
-	go self.loop()  
-	reply_ch := make(ReplyMessageChannel,1)
-	self.control_ch <- initControlMessage{ReplyChannel: reply_ch}
-	<- reply_ch
-}
-
 type callback_fn func() interface {}
 
 func send_and_wait_until(where chan interface {}, what interface {},
@@ -134,61 +126,81 @@ func send_and_wait_until(where chan interface {}, what interface {},
 		return timeout_cb()
 	}
 
-	return nil
-}
-
-
-func (self *GenServer) Stop() ReplyMessage {
-	if self.status >= STOPPED {
-		return ReplyMessage{Ok: false, Error: "GenServer Stopped or Crashed"}
-	}
-	timeout_ch := make(chan bool,1)
-	reply_ch := make(ReplyMessageChannel,1)
-	go func() {
-		time.Sleep(1e9)
-		timeout_ch <- true
-	}()
-	select {
-	case self.control_ch <- stopControlMessage{ReplyChannel: reply_ch}:
-		return <- reply_ch
-	case <- timeout_ch:
-		return ReplyMessage{Ok: false, Error: "GenServer Stop Timeout"}
-	}
 	return ReplyMessage{Ok: false, Error: "GenServer Error Unknown"}
 }
 
+func getopt_timeout(opts []interface{}, default_value int64) int64 {
+	timeout := default_value
+	if len(opts)>0 {
+		switch value := opts[0].(type) {
+		case int:
+			timeout = int64(value)
+		case int64:
+			timeout = value
+		case float64:
+			timeout = int64(value)
+		default:
+			// ERROR "timeout option type unknown"
+		}
+	}
 
-func (self *GenServer) Cast(payload Data) {
+	return timeout
+}
+
+func (self *GenServer) Start(opts ...interface{}) {
+	self.status = STARTING;
+	go self.loop()  
+
+	timeout := getopt_timeout(opts, 5e9)
+	reply_ch := make(ReplyMessageChannel,1)
+
+  send_and_wait_until(self.control_ch, initControlMessage{ReplyChannel: reply_ch},
+		func() interface{} { return <- reply_ch },
+		func() interface{} { return ReplyMessage{Ok: false, Error: "GenServer Cast Timeout"} },
+		timeout)
+}
+
+func (self *GenServer) Stop(opts ...interface{}) ReplyMessage {
+	if self.status >= STOPPED {
+		return ReplyMessage{Ok: false, Error: "GenServer Stopped or Crashed"}
+	}
+
+	timeout := getopt_timeout(opts, 5e9)
+	reply_ch := make(ReplyMessageChannel,1)
+
+	return send_and_wait_until(self.control_ch, stopControlMessage{ReplyChannel: reply_ch},
+		func() interface{} { return <- reply_ch },
+		func() interface{} { return ReplyMessage{Ok: false, Error: "GenServer Stop Timeout"} },
+		timeout).(ReplyMessage)
+}
+
+
+func (self *GenServer) Cast(payload Data, opts ...interface{}) {
 	if self.status >= STOPPED {
 		return // Error: "GenServer Stopped or Crashed"
 	}
 
-	// NOTE: This is blocking if receive is not ready
+	timeout := getopt_timeout(opts, 5e9)
+
 	send_and_wait_until(self.ch, CastMessage{Payload: payload},
-		func() interface{} { log.Print("CAST SENT"); return nil},
-		func() interface{} { log.Print("CAST TIMEOUT"); return nil},
-		5e9)
-	//self.ch <- CastMessage{Payload: payload}
+		func() interface{} { return ReplyMessage{Ok: true} },
+		func() interface{} { return ReplyMessage{Ok: false, Error: "GenServer Cast Timeout"} },
+		timeout)
 }
 
-func (self *GenServer) Call(payload Data) ReplyMessage {
+func (self *GenServer) Call(payload Data, opts ...interface{}) ReplyMessage {
 	if self.status >= STOPPED {
 		return ReplyMessage{Ok: false, Error: "GenServer Stopped or Crashed"}
 	}
 
-	timeout_ch := make(chan bool,1)
+	timeout := getopt_timeout(opts, 5e9)
 	reply_ch := make(ReplyMessageChannel,1)
-	go func() {
-		time.Sleep(1e9)
-		timeout_ch <- true
-	}()
-	select {
-	case self.ch <- CallMessage{Payload: payload, replyChannel: reply_ch}:
-		return <- reply_ch
-	case <- timeout_ch:
-		return ReplyMessage{Ok: false, Error: "GenServer Stop Timeout"}
-	}
-	return ReplyMessage{Ok: false, Error: "GenServer Error Unknown"}
+
+	return send_and_wait_until(self.ch, 
+		CallMessage{Payload: payload, replyChannel: reply_ch},
+		func() interface{} { return <- reply_ch },
+		func() interface{} { return ReplyMessage{Ok: false, Error: "GenServer Stop Timeout"} },
+		timeout).(ReplyMessage)
 }
 
 func (self *CallMessage) Reply(ok bool, result Data) {
