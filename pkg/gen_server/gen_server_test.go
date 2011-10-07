@@ -34,7 +34,7 @@ func (self *TestServer) Start() bool {
 	return true
 }
 
-func (self *TestServer) Init(args Data) (bool, Data) {
+func (self *TestServer) Init(args Data) (bool, State) {
 	return true, nil
 }
 
@@ -46,7 +46,7 @@ type CastCrashTestMessage struct {
 	msg string
 }
 
-func (self *TestServer) HandleCast(cast *CastMessage) {
+func (self *TestServer) HandleCast(cast *CastMessage, state State) {
 	self.log("HANDLE CAST ", cast)
 	self.last_cast_received = cast
 	switch payload := cast.Payload.(type) {

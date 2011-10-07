@@ -121,12 +121,12 @@ func (self *GenServer) handle_stop(cmd *stopControlMessage) {
 // handle_cast will be called to handle incoming CastMessages
 func (self *GenServer) handle_cast(cast *CastMessage) {
 	self.log("RECEIVED CAST ",cast)
-	self.impl.HandleCast(cast)
+	self.impl.HandleCast(cast,self.state)
 }
 
 // handle_call will be called to handle incoming CallMessages
 func (self *GenServer) handle_call(call *CallMessage) {
 	self.log("RECEIVED CALL ",call)
-	self.impl.HandleCall(call)
+	self.impl.HandleCall(call,self.state)
 }
 

@@ -2,8 +2,10 @@ package gen_server
 
 // Message represents the opaque type of gen_server exchanged messages
 type Message interface {}
-// MessageContent represents the opaque type of gen_server exchanged data
+// Data represents the opaque type of gen_server exchanged data
 type Data interface {}
+// State represents the opaque type of gen_server implementation state
+type State interface {}
 
 // CastMessage is a asynchronous message (it doesn't need a reply)
 type CastMessage struct {
@@ -57,7 +59,7 @@ type GenServer struct {
   ch MessageChannel
   control_ch controlChannel
 	impl IGenServerImpl
-	state Data
+	state State
 	status int
 	debug bool
 }
@@ -65,10 +67,10 @@ type GenServer struct {
 // IGenServerImpl is the interface that GenServer implementations have to implements:
 type IGenServerImpl interface {
   // Init initialize the server returning a state, optionally based on Init arguments
-  Init(args Data) (bool, Data)
+  Init(args Data) (bool, State)
   // HandleCast handle cast messages
-	HandleCast(msg *CastMessage)
+	HandleCast(msg *CastMessage, state State) 
   // HandleCall handle call messages
-	HandleCall(msg *CallMessage)
+	HandleCall(msg *CallMessage, state State)
 }
 
