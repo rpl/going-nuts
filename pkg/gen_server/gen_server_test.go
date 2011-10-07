@@ -30,7 +30,7 @@ func CreateTestServer() *TestServer {
 }
 
 func (self *TestServer) Start() bool {
-	self.GenServer.Start()  
+	self.GenServer.Start(nil)  
 	return true
 }
 

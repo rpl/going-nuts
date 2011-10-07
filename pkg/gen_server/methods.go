@@ -65,8 +65,14 @@ func (self *GenServer) SetDebug(debug bool) {
 // handle_init will be called to handle incoming InitControlMessages
 func (self *GenServer) handle_init(cmd *initControlMessage) {
   self.log("RECEIVED INIT ",cmd)
-	self.status = READY
-	cmd.ReplyChannel <- ReplyMessage{Ok: true}
+	ok, state := self.impl.Init(cmd.Args)
+	if ok == true {
+		self.state = state
+		self.status = READY
+		cmd.ReplyChannel <- ReplyMessage{Ok: true}
+	} else {
+		cmd.ReplyChannel <- ReplyMessage{Ok: false, Error: "GenServer Init failed"}
+	}
 }
 
 // handle_stop will be called to handle incoming StopControlMessages
@@ -147,14 +153,15 @@ func getopt_timeout(opts []interface{}, default_value int64) int64 {
 	return timeout
 }
 
-func (self *GenServer) Start(opts ...interface{}) {
+func (self *GenServer) Start(init_args Data, opts ...interface{}) {
 	self.status = STARTING;
 	go self.loop()  
 
 	timeout := getopt_timeout(opts, 5e9)
 	reply_ch := make(ReplyMessageChannel,1)
 
-  send_and_wait_until(self.control_ch, initControlMessage{ReplyChannel: reply_ch},
+  send_and_wait_until(self.control_ch, 
+		initControlMessage{Args: init_args, ReplyChannel: reply_ch},
 		func() interface{} { return <- reply_ch },
 		func() interface{} { return ReplyMessage{Ok: false, Error: "GenServer Cast Timeout"} },
 		timeout)
